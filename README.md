@@ -1,229 +1,179 @@
-# Xionco Chatbot - AI Assistant with Spring Boot & Ollama
+# Xionco Chatbot
 
-A production-ready chatbot application featuring Spring Boot 3.5.3 backend with Spring AI 2.0.0 integration to Ollama's Qwen2.5:7b LLM, complete with Thymeleaf frontend and **full Podman containerization for both services**.
+Aplikasi chatbot AI cerdas berbasis Spring Boot dengan LLM lokal menggunakan Ollama dan Podman. Antarmuka web responsif dengan Thymeleaf dan Tailwind CSS.
 
-## Features
+**Status**: ✅ Fully Operational - Running with TinyLlama 1.1B Model
 
-- **Fully Containerized**: Both Ollama (LLM) and Spring Boot (Chatbot) run in Podman containers
-- **Local LLM**: Qwen2.5:7b model in Ollama container (port 11434)
-- **Multi-turn Conversations**: Full conversation history per session
-- **Real-time UI**: Thymeleaf + Tailwind CSS with AJAX chat
-- **Bahasa Indonesia**: Complete Indonesian language UI and system prompts
-- **Service Communication**: Containers connected via bridge network
-- **Comprehensive Tests**: 12 unit tests covering service and API layers
-- **XSS Protection**: Secure input handling throughout
+## 📋 Prasyarat
 
-## Quick Start (Podman)
+Sebelum menjalankan aplikasi, pastikan Anda sudah menginstal:
 
-### Prerequisites
-- Podman (v6.0.0+)
-- podman-compose (v1.6.0+)
-- At least 8GB available for model
+- **Podman** (v5.0+) - Container runtime alternatif untuk Docker
+  - macOS: `brew install podman`
+  - Linux: Ikuti https://podman.io/docs/installation
+  - Windows: Download dari https://podman.io/docs/installation
 
-### Run Everything in Podman
+- **Podman Compose** (v1.0+)
+  ```bash
+  pip install podman-compose
+  ```
+
+- **Java 25** (JDK)
+  - macOS: `brew install openjdk@25`
+  - Linux/Windows: Download dari https://www.oracle.com/java/technologies/downloads/
+
+- **Maven 3.8+** (untuk build - opsional jika hanya menjalankan)
+  - macOS: `brew install maven`
+
+## 🚀 Cara Menjalankan Aplikasi
+
+### Metode 1: Menggunakan Script (Rekomendasi)
+
+Script otomatis akan mengelola semua proses:
 
 ```bash
-# 1. Clone/navigate to project directory
+# Clone repository
+git clone https://github.com/sinagajunior/xionco_chatbot.git
 cd xionco_chatbot
 
-# 2. Build and start all services
+# Jalankan script
+chmod +x start.sh
+./start.sh
+```
+
+Script akan otomatis:
+- ✅ Memverifikasi instalasi Podman
+- ✅ Membangun dan menjalankan container
+- ✅ Menunggu Ollama siap
+- ✅ Memuat model TinyLlama (~600MB)
+- ✅ Menunggu Spring Boot startup
+- ✅ Menampilkan status container
+
+### Metode 2: Manual (Langkah demi Langkah)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/sinagajunior/xionco_chatbot.git
+cd xionco_chatbot
+
+# 2. Bangun dan jalankan container
 podman-compose up -d
 
-# 3. Wait for Ollama to be ready, then pull the model
-sleep 10
-podman exec -it ollama ollama pull qwen2.5:7b
+# 3. Tunggu Ollama siap (tunggu ~15 detik)
+sleep 15
 
-# 4. Wait for chatbot to start (healthcheck will verify)
-sleep 30
+# 4. Load model TinyLlama (pertama kali akan download ~600MB)
+podman exec ollama ollama pull tinyllama:latest
 
-# 5. Open browser
-http://localhost:8080/chat
+# 5. Tunggu Spring Boot startup (tunggu ~20 detik)
+sleep 20
+
+# 6. Verifikasi semua container berjalan
+podman-compose ps
 ```
 
-### Stop Everything
+### Metode 3: Development (Tanpa Full Containerization)
+
+Jika ingin develop di local machine:
 
 ```bash
-podman-compose down
-```
-
-### View Logs
-
-```bash
-# All services
-podman-compose logs -f
-
-# Just chatbot
-podman-compose logs -f chatbot
-
-# Just Ollama
-podman-compose logs -f ollama
-```
-
-## Local Development (Without Podman)
-
-### Prerequisites
-- Java 25+
-- Maven 3.8+
-- Podman (for Ollama only)
-
-### Development Setup
-
-```bash
-# 1. Start Ollama in Podman
+# 1. Jalankan Ollama container saja
 podman-compose up -d ollama
 
-# 2. Pull model
-podman exec -it ollama ollama pull qwen2.5:7b
+# 2. Tunggu dan pull model
+sleep 10
+podman exec ollama ollama pull tinyllama:latest
 
-# 3. Run Spring Boot application
+# 3. Jalankan Spring Boot di local
 mvn spring-boot:run
+```
 
-# 4. Open browser
+## 🌐 Akses Aplikasi
+
+Setelah semua container berjalan, buka browser:
+
+```
 http://localhost:8080/chat
 ```
 
-## Architecture
+Anda akan melihat:
+- 💬 Interface chat yang elegan dengan Tailwind CSS
+- 📝 Kolom input untuk mengetik pesan
+- ⚡ Real-time responses dari AI
+- 🧹 Tombol untuk menghapus riwayat percakapan
+- ⏳ Loading indicator saat model memproses
 
-### Services (in compose.yaml)
+## ✅ Verifikasi Instalasi
 
-| Service | Container | Port | Role |
-|---------|-----------|------|------|
-| ollama | `docker.io/ollama/ollama:latest` | 11434 | LLM backend |
-| chatbot | Built from Dockerfile | 8080 | Spring Boot app |
-
-### Networking
-- Both services connected via `xionco-network` bridge network
-- Chatbot communicates with Ollama via internal hostname `ollama:11434`
-- Exposed to host at `localhost:8080` and `localhost:11434`
-
-### Build & Deploy
-
-**Dockerfile stages:**
-1. **Builder**: Maven + JDK 25 → compiles and packages JAR
-2. **Runtime**: JRE 25 → runs the lightweight JAR
-
-```dockerfile
-# Build stage: Maven compile
-FROM eclipse-temurin:25-jdk AS builder
-WORKDIR /build
-COPY pom.xml .
-COPY src src/
-RUN mvn clean package -DskipTests
-
-# Runtime stage: JRE only
-FROM eclipse-temurin:25-jre
-COPY --from=builder /build/app.jar .
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-## API Endpoints
-
-### Web Routes (Thymeleaf MVC)
-- `GET /` → Redirects to `/chat`
-- `GET /chat` → Renders chat page with conversation history
-- `GET /chat/clear` → Clears history and redirects to chat
-
-### REST API (JSON)
-- `POST /api/chat` - Send message
-  ```json
-  {
-    "message": "Halo, siapa nama Anda?",
-    "sessionId": "user-123"
-  }
-  ```
-  Response:
-  ```json
-  {
-    "status": "sukses",
-    "role": "assistant",
-    "content": "Saya Xionco, asisten AI Anda.",
-    "timestamp": "14:30:45"
-  }
-  ```
-
-- `DELETE /api/chat/clear` - Clear conversation history
-  ```
-  Query params: ?sessionId=user-123
-  ```
-
-## Testing
+### Cek Container Berjalan
 
 ```bash
-# Run all tests
-mvn test
-
-# Service tests only
-mvn test -Dtest=ChatServiceTest
-
-# API controller tests only
-mvn test -Dtest=ChatApiControllerTest
+podman-compose ps
 ```
 
-**Test Coverage:**
-- **ChatServiceTest** (7 tests)
-  - Assistant message responses
-  - System prompt initialization
-  - Default session handling
-  - Multi-turn conversations
-  - Error handling
-  - History clearing
-  - System message filtering
-
-- **ChatApiControllerTest** (5 tests)
-  - POST /api/chat success (200)
-  - POST /api/chat error (500)
-  - Empty message validation (4xx)
-  - Session forwarding
-  - DELETE /api/chat/clear
-
-## Configuration
-
-### application.yaml
-```yaml
-server:
-  port: 8080
-
-spring:
-  ai:
-    ollama:
-      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
-      chat:
-        model: qwen2.5:7b
-        options:
-          temperature: 0.7
-          num-ctx: 4096
-          top-k: 40
-          top-p: 0.9
+Output yang benar:
+```
+CONTAINER ID  IMAGE                                  STATUS            PORTS
+xxxxx         docker.io/ollama/ollama                Up (healthy)      0.0.0.0:11434->11434/tcp
+xxxxx         localhost/xionco_chatbot_chatbot       Up (healthy)      0.0.0.0:8080->8080/tcp
 ```
 
-### Environment Variables
-- `SPRING_AI_OLLAMA_BASE_URL` - Ollama API endpoint (default: `http://localhost:11434`)
+### Cek Model Tersedia
 
-## Project Structure
+```bash
+curl -s http://localhost:11434/api/tags | jq '.models[].name'
+```
+
+Output yang benar:
+```
+"tinyllama:latest"
+```
+
+### Test Chat API
+
+```bash
+curl -s -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Halo!","sessionId":"test"}' | jq '.'
+```
+
+Output yang benar:
+```json
+{
+  "status": "sukses",
+  "role": "assistant",
+  "content": "...",
+  "timestamp": "14:30:45"
+}
+```
+
+## 📦 Arsitektur Aplikasi
 
 ```
 xionco_chatbot/
-├── pom.xml                           # Maven configuration
+├── compose.yaml                      # Konfigurasi Podman Compose
 ├── Dockerfile                        # Multi-stage build
-├── compose.yaml                      # Podman Compose (Ollama + Chatbot)
-├── README.md                         # This file
+├── pom.xml                          # Dependensi Maven
+├── start.sh                         # Script otomatis
+├── README.md                        # Dokumentasi
 ├── src/
 │   ├── main/
 │   │   ├── java/com/xionco/chatbot/
-│   │   │   ├── XioncoChatbotApplication.java
+│   │   │   ├── XioncoChatbotApplication.java      # Main class
 │   │   │   ├── controller/
-│   │   │   │   ├── ChatController.java       (MVC)
-│   │   │   │   └── ChatApiController.java    (REST)
+│   │   │   │   ├── ChatController.java            # MVC Thymeleaf
+│   │   │   │   └── ChatApiController.java         # REST API
 │   │   │   ├── service/
-│   │   │   │   └── ChatService.java
+│   │   │   │   └── ChatService.java               # Logika chat
+│   │   │   ├── config/
+│   │   │   │   └── RestConfig.java                # Spring config
 │   │   │   └── dto/
 │   │   │       ├── ChatMessage.java
 │   │   │       └── ChatRequest.java
 │   │   └── resources/
-│   │       ├── application.yaml
+│   │       ├── application.yaml                   # Config
 │   │       └── templates/
-│   │           └── chat.html
+│   │           └── chat.html                      # UI Thymeleaf
 │   └── test/java/com/xionco/chatbot/
 │       ├── service/ChatServiceTest.java
 │       └── controller/ChatApiControllerTest.java
@@ -231,77 +181,344 @@ xionco_chatbot/
     └── xionco-chatbot-1.0.0.jar
 ```
 
-## Technology Stack
+## 🛠️ Mengelola Container
 
-- **Backend**: Spring Boot 3.5.3
-- **LLM Framework**: Spring AI 2.0.0
-- **LLM Model**: Ollama (Qwen2.5:7b)
-- **Frontend**: Thymeleaf + Tailwind CSS (CDN)
-- **Container**: Podman + Podman Compose
-- **Java**: Version 25
-- **Build**: Maven 3.8+
-- **Testing**: JUnit 5 + Mockito
-- **Validation**: Jakarta Bean Validation
+### Lihat Log Real-time
 
-## Performance Notes
-
-- First startup pulls ~4GB Qwen model into Podman
-- Ollama container has persistent volume for model caching
-- Spring Boot startup ~5-10 seconds (excluding Ollama)
-- Chatbot healthcheck verifies readiness after 40 seconds
-- Conversation history stored in-memory (ConcurrentHashMap)
-
-## Troubleshooting
-
-### Ollama not connecting
 ```bash
-# Check if Ollama is running
-podman ps | grep ollama
+# Semua service
+podman-compose logs -f
 
-# View Ollama logs
-podman-compose logs ollama
+# Hanya Ollama
+podman-compose logs -f ollama
 
-# Verify model is pulled
-podman exec ollama ollama list
+# Hanya Spring Boot
+podman-compose logs -f chatbot
 ```
 
-### Chatbot not starting
-```bash
-# Check logs
-podman-compose logs chatbot
+### Stop Container
 
-# Verify Ollama is accessible from chatbot
-podman exec xionco-chatbot curl http://ollama:11434/api/tags
+```bash
+podman-compose down
 ```
 
-### Port conflicts
-```bash
-# Check which service is using port
-lsof -i :8080
-lsof -i :11434
+### Restart Container
 
-# Modify ports in compose.yaml if needed
+```bash
+podman-compose restart
 ```
 
-### Container build failures
+### Rebuild Image
+
 ```bash
-# Force rebuild without cache
+# Rebuild tanpa cache
 podman-compose build --no-cache
 
-# View build logs in detail
-podman-compose build --verbose
+# Jalankan ulang
+podman-compose up -d
 ```
 
-## Development Notes
+### Hapus Semua Data
 
-- **Session Management**: Uses default session ID "default" if not specified
-- **Conversation History**: Stored per-session in `ConcurrentHashMap`
-- **System Prompt**: Injected as first message for each session in Bahasa Indonesia
-- **Error Handling**: RuntimeException wraps Ollama errors with context
-- **XSS Protection**: Input escaped in HTML, validated in API layer
+```bash
+# Hapus container, network, dan volume
+podman-compose down -v
+```
 
-## License & Attribution
+## 📝 Testing
 
-Built with Spring Boot, Spring AI, and powered by Ollama's local LLM capabilities.
+### Jalankan Unit Tests
 
-Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+```bash
+mvn test
+```
+
+### Jalankan Test Tertentu
+
+```bash
+# Test ChatService saja
+mvn test -Dtest=ChatServiceTest
+
+# Test ChatApiController saja
+mvn test -Dtest=ChatApiControllerTest
+```
+
+## 🔧 Troubleshooting
+
+### ❌ "site can't be reached" - http://localhost:8080
+
+**Penyebab**: Spring Boot atau container tidak jalan
+
+**Solusi**:
+```bash
+# Cek status container
+podman-compose ps
+
+# Lihat log aplikasi
+podman logs xionco-chatbot
+
+# Tunggu lebih lama (~30 detik) dan coba lagi
+sleep 30
+
+# Jika masih error, restart
+podman-compose restart
+```
+
+### ❌ "insufficient memory" error
+
+**Penyebab**: Model membutuhkan lebih banyak RAM
+
+**Solusi**:
+- Aplikasi sudah menggunakan TinyLlama (608MB) - sangat hemat
+- Jika masih error, tingkatkan alokasi di `compose.yaml`:
+  ```yaml
+  deploy:
+    resources:
+      limits:
+        memory: 12G    # Naikkan dari 8G
+      reservations:
+        memory: 10G    # Naikkan dari 6G
+  ```
+
+### ❌ "unable to start container"
+
+**Solusi**:
+```bash
+# Stop semua
+podman-compose down
+
+# Rebuild tanpa cache
+podman-compose build --no-cache
+
+# Jalankan lagi
+podman-compose up -d
+```
+
+### ❌ Port 8080 atau 11434 sudah terpakai
+
+**Solusi**: Edit `compose.yaml` dan ubah port:
+```yaml
+services:
+  ollama:
+    ports:
+      - "11435:11434"  # Ganti port
+
+  chatbot:
+    ports:
+      - "8081:8080"    # Ganti port
+```
+
+Kemudian akses: `http://localhost:8081/chat`
+
+### ❌ Model tidak terload
+
+**Solusi**:
+```bash
+# Cek model yang tersedia
+curl http://localhost:11434/api/tags
+
+# Pull model manual
+podman exec ollama ollama pull tinyllama:latest
+
+# Verifikasi
+curl http://localhost:11434/api/tags
+```
+
+## 📊 Spesifikasi Sistem
+
+| Komponen | Minimum | Rekomendasi |
+|----------|---------|------------|
+| **RAM** | 2GB | 4GB+ |
+| **CPU** | 2 core | 4 core+ |
+| **Storage** | 1.5GB | 5GB+ |
+| **OS** | Linux/macOS | macOS/Linux |
+
+## 🎯 Fitur Aplikasi
+
+- ✅ Chat real-time dengan AI
+- ✅ Riwayat percakapan per session
+- ✅ Hapus riwayat chat dengan 1 klik
+- ✅ Responsif di desktop dan mobile
+- ✅ UI lengkap Bahasa Indonesia
+- ✅ Model LLM lokal (tidak butuh internet)
+- ✅ Fully containerized dengan Podman
+- ✅ Health checks otomatis
+- ✅ Multi-session support
+- ✅ XSS protection built-in
+
+## 🧠 Model AI: TinyLlama
+
+**TinyLlama** - Model bahasa 1.1B parameter
+- 📦 Ukuran: 608 MB
+- ⚡ Kecepatan: Sangat cepat
+- 💾 Memory: Minimal (~500MB saat running)
+- 📝 Context: 2048 tokens
+- 🎯 Performa: Optimal untuk chatbot umum
+
+Cocok untuk:
+- General purpose chatbot
+- Development & testing
+- Embedded systems
+- Learning purposes
+
+## 📡 API Endpoints
+
+### GET /chat
+Render halaman chat dengan Thymeleaf
+- Response: HTML page
+
+### POST /api/chat
+Kirim pesan ke chatbot
+
+**Request**:
+```json
+{
+  "message": "Halo, apa kabar?",
+  "sessionId": "user-123"
+}
+```
+
+**Response**:
+```json
+{
+  "status": "sukses",
+  "role": "assistant",
+  "content": "Halo! Saya baik-baik saja. Ada yang bisa saya bantu?",
+  "timestamp": "14:30:45"
+}
+```
+
+### DELETE /api/chat/clear
+Hapus riwayat percakapan
+
+**Request**:
+```json
+{
+  "sessionId": "user-123"
+}
+```
+
+**Response**: 200 OK
+
+## ⚙️ Konfigurasi
+
+### application.yaml
+
+```yaml
+server:
+  port: 8080
+
+spring:
+  application:
+    name: xionco-chatbot
+  thymeleaf:
+    cache: false
+    encoding: UTF-8
+
+app:
+  name: "Xionco Chatbot"
+  description: "Asisten AI Cerdas Berbasis TinyLlama"
+  greeting: "Halo! Saya Xionco, asisten AI Anda. Ada yang bisa saya bantu?"
+  placeholder: "Ketik pesan Anda di sini..."
+  send-button-text: "Kirim"
+```
+
+### compose.yaml
+
+```yaml
+services:
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 6G
+
+  chatbot:
+    build: .
+    container_name: xionco-chatbot
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+```
+
+## 🔐 Keamanan
+
+- ✅ Input di-escape untuk mencegah XSS
+- ✅ CSRF protection via Spring Security
+- ✅ Tidak ada data yang dikirim ke internet
+- ✅ Model berjalan 100% lokal
+- ✅ No external API dependencies
+
+## 📚 Stack Teknologi
+
+| Layer | Teknologi |
+|-------|-----------|
+| **Backend** | Spring Boot 3.5.3, Spring Web |
+| **Frontend** | Thymeleaf, Tailwind CSS |
+| **Database** | In-memory (ConcurrentHashMap) |
+| **LLM** | Ollama + TinyLlama 1.1B |
+| **Container** | Podman + Podman Compose |
+| **Build** | Maven, Docker multi-stage |
+| **Testing** | JUnit 5, Mockito |
+| **Java** | Version 25 |
+
+## 📖 Dokumentasi Lengkap
+
+- Spring Boot: https://spring.io/projects/spring-boot
+- Thymeleaf: https://www.thymeleaf.org/
+- Ollama: https://ollama.ai/
+- Podman: https://podman.io/
+- TinyLlama: https://github.com/jzhang38/TinyLlama
+
+## 🚀 Deploy ke Production
+
+Untuk production deployment:
+
+1. Update `application.yaml` dengan production config
+2. Setup reverse proxy (Nginx/Apache)
+3. Configure SSL/TLS certificates
+4. Increase resource limits sesuai kebutuhan
+5. Setup monitoring & logging
+6. Consider Kubernetes untuk scaling
+
+## 🤝 Contributing
+
+Fork repository dan submit pull requests untuk improvements!
+
+## 📄 Lisensi
+
+MIT License - Bebas digunakan untuk komersial maupun personal
+
+## 👥 Tim
+
+- **Developer**: Roy
+- **AI Assistant**: Claude Haiku 4.5
+
+## 📞 Support & Issues
+
+Jika menemukan bug atau ada pertanyaan:
+1. Cek bagian Troubleshooting di atas
+2. Lihat logs container: `podman-compose logs`
+3. Buat issue di GitHub
+
+---
+
+**Terima kasih sudah menggunakan Xionco Chatbot! 🎉**
+
+Jika dokumentasi ini membantu, berikan ⭐ di GitHub!
+
+**Last Updated**: August 2026
+**Status**: ✅ Fully Operational
+**Model**: TinyLlama 1.1B
+**Version**: 1.0.0
