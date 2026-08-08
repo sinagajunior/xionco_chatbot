@@ -503,7 +503,7 @@ MIT License - Bebas digunakan untuk komersial maupun personal
 ## 👥 Tim
 
 - **Developer**: Roy
-- **AI Assistant**: Claude Haiku 4.5
+
 
 ## 📞 Support & Issues
 
@@ -522,3 +522,8 @@ Jika dokumentasi ini membantu, berikan ⭐ di GitHub!
 **Status**: ✅ Fully Operational
 **Model**: TinyLlama 1.1B
 **Version**: 1.0.0
+
+screen shoot
+
+<img width="1910" height="1070" alt="xionco_bot_chat" src="https://github.com/user-attachments/assets/309c6d5e-f5b5-4aa4-ba9a-050fa5278c40" />
+
