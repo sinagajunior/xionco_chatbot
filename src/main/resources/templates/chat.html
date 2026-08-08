@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${appName}">Xionco Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100">
+    <div class="flex flex-col h-screen">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
+            <div class="max-w-4xl mx-auto px-6 py-4">
+                <h1 class="text-2xl font-bold" th:text="${appName}">Xionco Chatbot</h1>
+                <p class="text-blue-100 text-sm" th:text="${appDescription}">Asisten AI Cerdas</p>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="flex-1 overflow-y-auto bg-white">
+            <div class="max-w-4xl mx-auto px-6 py-6 space-y-4">
+                <!-- Initial Greeting -->
+                <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="text-blue-900 font-semibold" th:text="${greeting}">
+                        Halo! Saya Xionco...
+                    </div>
+                </div>
+
+                <!-- Chat History -->
+                <div id="chatHistory" class="space-y-4">
+                    <th:block th:each="msg : ${history}">
+                        <!-- User Message -->
+                        <div th:if="${msg.isUser()}" class="flex justify-end">
+                            <div class="bg-blue-500 text-white rounded-lg px-4 py-2 max-w-xs lg:max-w-md rounded-br-none">
+                                <p th:text="${msg.content()}"></p>
+                                <p class="text-blue-100 text-xs mt-1" th:text="${msg.formattedTimestamp()}"></p>
+                            </div>
+                        </div>
+
+                        <!-- Assistant Message -->
+                        <div th:if="${msg.isAssistant()}" class="flex justify-start">
+                            <div class="bg-slate-200 text-slate-900 rounded-lg px-4 py-2 max-w-xs lg:max-w-md rounded-bl-none">
+                                <p th:text="${msg.content()}"></p>
+                                <p class="text-slate-600 text-xs mt-1" th:text="${msg.formattedTimestamp()}"></p>
+                            </div>
+                        </div>
+                    </th:block>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="hidden">
+                    <div class="flex justify-start">
+                        <div class="bg-slate-200 text-slate-900 rounded-lg px-4 py-2 rounded-bl-none">
+                            <p class="text-slate-600" th:text="${loadingText}">Xionco sedang berpikir...</p>
+                            <div class="flex gap-1 mt-2">
+                                <span class="inline-block w-2 h-2 bg-slate-500 rounded-full animate-bounce"></span>
+                                <span class="inline-block w-2 h-2 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.1s;"></span>
+                                <span class="inline-block w-2 h-2 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.2s;"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="hidden">
+                    <div class="flex justify-center">
+                        <div class="bg-red-100 text-red-800 rounded-lg px-4 py-2 max-w-xs lg:max-w-md border border-red-200">
+                            <p th:text="${errorText}">Maaf, terjadi kesalahan...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-white border-t border-slate-200 shadow-lg">
+            <div class="max-w-4xl mx-auto px-6 py-4">
+                <div class="flex gap-2">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        class="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        th:placeholder="${placeholder}"
+                        autocomplete="off"
+                    >
+                    <button
+                        id="sendButton"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors"
+                        th:text="${sendButtonText}"
+                    >
+                        Kirim
+                    </button>
+                    <button
+                        id="clearButton"
+                        class="bg-slate-400 hover:bg-slate-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+                        title="Bersihkan riwayat"
+                    >
+                        ⟳
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById('chatHistory');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const clearButton = document.getElementById('clearButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function addMessage(role, content, timestamp = '') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+            const bubbleClass = role === 'user'
+                ? 'bg-blue-500 text-white rounded-lg px-4 py-2 max-w-xs lg:max-w-md rounded-br-none'
+                : 'bg-slate-200 text-slate-900 rounded-lg px-4 py-2 max-w-xs lg:max-w-md rounded-bl-none';
+
+            const timeClass = role === 'user'
+                ? 'text-blue-100 text-xs mt-1'
+                : 'text-slate-600 text-xs mt-1';
+
+            messageDiv.innerHTML = `
+                <div class="${bubbleClass}">
+                    <p>${escapeHtml(content)}</p>
+                    ${timestamp ? `<p class="${timeClass}">${escapeHtml(timestamp)}</p>` : ''}
+                </div>
+            `;
+
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const chatContainer = chatHistory.closest('.overflow-y-auto');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            messageInput.value = '';
+            loadingIndicator.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        sessionId: 'default'
+                    })
+                });
+
+                loadingIndicator.classList.add('hidden');
+
+                if (!response.ok) {
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.status === 'sukses') {
+                    addMessage(data.role, data.content, data.timestamp);
+                } else {
+                    errorMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                loadingIndicator.classList.add('hidden');
+                errorMessage.classList.remove('hidden');
+                console.error('Error:', error);
+            }
+
+            messageInput.focus();
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        clearButton.addEventListener('click', async () => {
+            if (confirm('Yakin ingin menghapus riwayat percakapan?')) {
+                await fetch('/api/chat/clear', { method: 'DELETE' });
+                location.reload();
+            }
+        });
+
+        messageInput.focus();
+    </script>
+</body>
+</html>
