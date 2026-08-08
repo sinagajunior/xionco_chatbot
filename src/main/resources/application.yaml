@@ -9,7 +9,7 @@ spring:
     encoding: UTF-8
   ai:
     ollama:
-      base-url: http://localhost:11434
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         model: qwen2.5:7b
         options:

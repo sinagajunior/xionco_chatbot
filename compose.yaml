@@ -7,6 +7,8 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
+    networks:
+      - xionco-network
     # For GPU (optional - Apple Silicon):
     # deploy:
     #   resources:
@@ -14,5 +16,30 @@ services:
     #       devices:
     #         - capabilities: [gpu]
 
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xionco-chatbot
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - xionco-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/chat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   ollama_data:
+
+networks:
+  xionco-network:
+    driver: bridge
