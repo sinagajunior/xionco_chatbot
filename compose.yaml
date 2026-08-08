@@ -6,9 +6,17 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
     restart: unless-stopped
     networks:
       - xionco-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     # For GPU (optional - Apple Silicon):
     # deploy:
     #   resources:

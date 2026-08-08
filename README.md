@@ -1,14 +1,15 @@
 # Xionco Chatbot - AI Assistant with Spring Boot & Ollama
 
-A production-ready chatbot application featuring Spring Boot 3.5.3 backend with Spring AI 2.0.0 integration to Ollama's Qwen2.5:7b LLM, complete with Thymeleaf frontend and full containerization.
+A production-ready chatbot application featuring Spring Boot 3.5.3 backend with Spring AI 2.0.0 integration to Ollama's Qwen2.5:7b LLM, complete with Thymeleaf frontend and **full Podman containerization for both services**.
 
 ## Features
 
-- **Local LLM Integration**: Qwen2.5:7b running in Podman via Ollama
+- **Fully Containerized**: Both Ollama (LLM) and Spring Boot (Chatbot) run in Podman containers
+- **Local LLM**: Qwen2.5:7b model in Ollama container (port 11434)
 - **Multi-turn Conversations**: Full conversation history per session
 - **Real-time UI**: Thymeleaf + Tailwind CSS with AJAX chat
 - **Bahasa Indonesia**: Complete Indonesian language UI and system prompts
-- **Fully Containerized**: Both Ollama and Spring Boot app run in Podman
+- **Service Communication**: Containers connected via bridge network
 - **Comprehensive Tests**: 12 unit tests covering service and API layers
 - **XSS Protection**: Secure input handling throughout
 
