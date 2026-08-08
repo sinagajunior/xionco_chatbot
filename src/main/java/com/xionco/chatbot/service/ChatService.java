@@ -1,15 +1,15 @@
 package com.xionco.chatbot.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xionco.chatbot.dto.ChatMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -22,11 +22,17 @@ public class ChatService {
             Jika Anda tidak tahu jawaban, katakan dengan jujur dan tawarkan bantuan lain.
             """;
 
-    private final ChatModel chatModel;
-    private final ConcurrentHashMap<String, List<Message>> conversationHistory;
+    private final RestTemplate restTemplate;
+    private final String ollamaBaseUrl;
+    private final ConcurrentHashMap<String, List<ChatMessage>> conversationHistory;
+    private final ObjectMapper objectMapper;
 
-    public ChatService(ChatModel chatModel) {
-        this.chatModel = chatModel;
+    public ChatService(@Value("${spring.ai.ollama.base-url:http://localhost:11434}") String ollamaBaseUrl,
+                      RestTemplate restTemplate,
+                      ObjectMapper objectMapper) {
+        this.ollamaBaseUrl = ollamaBaseUrl;
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
         this.conversationHistory = new ConcurrentHashMap<>();
     }
 
@@ -34,27 +40,45 @@ public class ChatService {
         String session = sessionId != null && !sessionId.isBlank() ? sessionId : DEFAULT_SESSION_ID;
 
         // Initialize session with system message if new
-        conversationHistory.computeIfAbsent(session, k -> {
-            List<Message> messages = new ArrayList<>();
-            messages.add(new SystemMessage(SYSTEM_PROMPT));
-            return messages;
-        });
+        conversationHistory.computeIfAbsent(session, k -> new ArrayList<>());
+        List<ChatMessage> messages = conversationHistory.get(session);
 
         // Add user message
-        List<Message> messages = conversationHistory.get(session);
-        messages.add(new UserMessage(userInput));
+        ChatMessage userMessage = new ChatMessage("user", userInput, LocalDateTime.now());
+        messages.add(userMessage);
 
         try {
-            // Create prompt and call chat model
-            Prompt prompt = new Prompt(messages);
-            var chatResponse = chatModel.call(prompt);
-            String response = chatResponse.getResult().getOutput().getText();
+            // Build messages for Ollama
+            List<Map<String, String>> ollamaMessages = new ArrayList<>();
+            ollamaMessages.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
+
+            for (ChatMessage msg : messages) {
+                ollamaMessages.add(Map.of("role", msg.role(), "content", msg.content()));
+            }
+
+            // Call Ollama API
+            Map<String, Object> request = Map.of(
+                    "model", "tinyllama:latest",
+                    "messages", ollamaMessages,
+                    "stream", false
+            );
+
+            String response = restTemplate.postForObject(
+                    ollamaBaseUrl + "/api/chat",
+                    request,
+                    String.class
+            );
+
+            // Parse response
+            var responseMap = objectMapper.readValue(response, Map.class);
+            var assistantMessage = (Map<String, Object>) responseMap.get("message");
+            String content = (String) assistantMessage.get("content");
 
             // Add assistant response to history
-            Message assistantMessage = new org.springframework.ai.chat.messages.AssistantMessage(response);
-            messages.add(assistantMessage);
+            ChatMessage chatMessage = new ChatMessage("assistant", content, LocalDateTime.now());
+            messages.add(chatMessage);
 
-            return ChatMessage.ofAssistant(response);
+            return chatMessage;
         } catch (Exception e) {
             throw new RuntimeException("Kesalahan saat berkomunikasi dengan Ollama: " + e.getMessage(), e);
         }
@@ -67,15 +91,6 @@ public class ChatService {
 
     public List<ChatMessage> getHistory(String sessionId) {
         String session = sessionId != null && !sessionId.isBlank() ? sessionId : DEFAULT_SESSION_ID;
-        List<Message> messages = conversationHistory.getOrDefault(session, new ArrayList<>());
-
-        // Filter out system messages and convert to ChatMessage records
-        return messages.stream()
-                .filter(msg -> !(msg instanceof SystemMessage))
-                .map(msg -> {
-                    String role = msg instanceof org.springframework.ai.chat.messages.AssistantMessage ? "assistant" : "user";
-                    return new ChatMessage(role, msg.getText(), null);
-                })
-                .toList();
+        return new ArrayList<>(conversationHistory.getOrDefault(session, new ArrayList<>()));
     }
 }

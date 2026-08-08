@@ -22,7 +22,7 @@ spring:
 
 app:
   name: "Xionco Chatbot"
-  description: "Asisten AI Cerdas Berbasis Qwen"
+  description: "Asisten AI Cerdas Berbasis TinyLlama"
   greeting: "Halo! Saya Xionco, asisten AI Anda. Ada yang bisa saya bantu?"
   placeholder: "Ketik pesan Anda di sini..."
   send-button-text: "Kirim"

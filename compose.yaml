@@ -17,12 +17,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # For GPU (optional - Apple Silicon):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: [gpu]
+    # Increased memory allocation for running LLM models
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 6G
 
   chatbot:
     build:
